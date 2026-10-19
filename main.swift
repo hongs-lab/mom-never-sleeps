@@ -334,6 +334,7 @@ struct SetupView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Text("딴짓하면 바로 달려간다.\n다 하면 간식 줄게.")
                         .font(.system(size: 13)).foregroundColor(Palette.muted).lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)   // 없으면 둘째 줄이 "…"로 잘림
                 }
             }
             VStack(spacing: 12) {
