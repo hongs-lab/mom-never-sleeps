@@ -419,6 +419,7 @@ final class StudyController: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var busy = true
     private var sessionStarted = false
     private var finished = false
+    private var leaving = false   // 끝나고 엄마가 나갈 때만 스스로 종료
     private var child = Child.daughter
 
     init(artwork: Artwork, demo: Bool) {
@@ -465,8 +466,8 @@ final class StudyController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         heading.isEnabled = false
         menu.addItem(heading)
         menu.addItem(.separator())
-        let quit = NSMenuItem(title: "엄마 몰래 그만두기", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        quit.target = NSApp
+        let quit = NSMenuItem(title: "엄마 몰래 그만두기", action: #selector(quitTapped), keyEquivalent: "q")
+        quit.target = self
         menu.addItem(quit)
         item.menu = menu
         status = item
@@ -497,6 +498,8 @@ final class StudyController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func start(minutes: Int, child: Child) {
         sessionStarted = true
+        // 공부 중엔 터미널 Ctrl-C·창 닫기·kill 로도 안 꺼지게. ponytail: 강제 종료(kill -9, 활동 모니터)는 못 막음
+        for sig in [SIGINT, SIGTERM, SIGHUP] { signal(sig, SIG_IGN) }
         self.child = child
         setupWindow?.close()
         setupWindow = nil
@@ -606,6 +609,7 @@ final class StudyController: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // 간식 주고 인사한 뒤 화면 밖으로 달려 나가면 앱이 꺼집니다(run.command 도 같이 끝남).
     private func leave() {
+        leaving = true
         say("고생했다 우리 \(child.rawValue)~\n엄마는 드라마 보러 간다.", caption: "공부 끝")
         after(2.5) { [weak self] in
             guard let self = self else { return }
@@ -652,6 +656,33 @@ final class StudyController: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         show(snack: Snack.all[index])
         after(2.5) { [weak self] in self?.previewSnack(at: index + 1) }
+    }
+
+    // 공부 시작 전·미리보기·끝난 뒤에만 끌 수 있음
+    private var canQuit: Bool { !sessionStarted || demo || leaving }
+
+    @objc private func quitTapped() {
+        if canQuit { NSApp.terminate(nil) } else { escapeAttempt() }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // 로그아웃·재시동·시스템 종료는 막지 않음 (막으면 맥이 안 꺼짐)
+        let byMacOS = NSAppleEventManager.shared().currentAppleEvent?.attributeDescriptor(forKeyword: kAEQuitReason) != nil
+        if canQuit || byMacOS { return .terminateNow }
+        escapeAttempt()
+        return .terminateCancel
+    }
+
+    private func escapeAttempt() {
+        guard !busy else { return }   // 딴짓 잡으러 가는 중이면 그쪽이 먼저
+        busy = true
+        mom.pose = .scold
+        say("어딜 도망가?\n공부 끝날 때까지 못 끈다.", caption: "그만두기 실패", urgent: true)
+        after(2.5) { [weak self] in
+            self?.mom.pose = .watch
+            self?.mom.line = nil
+            self?.busy = false
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
