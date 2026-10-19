@@ -1,0 +1,7 @@
+.DS_Store
+# 빌드 결과
+/mom
+/.mom-*
+/release/
+# 안 쓰는 예전 간식 시트 (assets/holding 으로 바뀜)
+/assets/mom-snacks.png
